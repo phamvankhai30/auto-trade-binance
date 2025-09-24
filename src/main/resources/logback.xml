@@ -1,0 +1,86 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<configuration>
+    <property name="LOG_FILE_NAME" value="auto-trade-binance"/>
+    <property name="LOG_DIR" value="logs"/>
+    <property name="LOG_LEVEL_DEBUG" value="DEBUG"/>
+    <property name="LOG_LEVEL_INFO" value="INFO"/>
+    <property name="LOG_LEVEL_WARN" value="WARN"/>
+    <property name="LOG_LEVEL_ERROR" value="ERROR"/>
+    <property name="LOG_INTO_CONSOLE" value="CONSOLE"/>
+    <property name="LOG_INTO_FILE" value="FILE"/>
+    <property name="LOG_MAX_SIZE" value="10MB"/>
+    <property name="LOG_MAX_HISTORY" value="3"/>
+    <property name="LOG_MAX_TOTAL_SIZE_CAP" value="500MB"/>
+    <property name="LOG_PACKAGE_NAME" value="com.kapa.okx"/>
+    <property name="LOG_ADDITIVITY" value="false"/>
+    <property name="LOG_TIMEZONE" value="Asia/Ho_Chi_Minh"/>
+    <property name="LOG_PATTERN_CONSOLE"
+              value="%d{dd-MM-yyyy HH:mm:ss.SSS} %thread %highlight(%-5level) %class{5}:%line | %msg%n"/>
+    <property name="LOG_PATTERN_FILE"
+              value="%d{dd-MM-yyyy HH:mm:ss.SSS} %thread %-5level %class{5}:%line | %msg%n"/>
+
+    <!--Log into screen console-->
+    <appender name="${LOG_INTO_CONSOLE}" class="ch.qos.logback.core.ConsoleAppender">
+        <encoder>
+            <pattern>
+                ${LOG_PATTERN_CONSOLE}
+            </pattern>
+        </encoder>
+    </appender>
+
+    <!--Log into file-->
+    <appender name="${LOG_INTO_FILE}" class="ch.qos.logback.core.rolling.RollingFileAppender">
+        <file>${LOG_DIR}/${LOG_FILE_NAME}.log</file>
+        <encoder>
+            <pattern>${LOG_PATTERN_FILE}</pattern>
+        </encoder>
+        <rollingPolicy class="ch.qos.logback.core.rolling.SizeAndTimeBasedRollingPolicy">
+            <fileNamePattern>${LOG_DIR}/${LOG_FILE_NAME}-%d{yyyy-MM-dd}.%i.log.gz</fileNamePattern>
+            <maxFileSize>${LOG_MAX_SIZE}</maxFileSize>
+            <maxHistory>${LOG_MAX_HISTORY}</maxHistory>
+            <totalSizeCap>${LOG_MAX_TOTAL_SIZE_CAP}</totalSizeCap>
+        </rollingPolicy>
+    </appender>
+
+    <!-- Log riêng từng user -->
+    <appender name="USER-FILE" class="ch.qos.logback.classic.sift.SiftingAppender">
+        <discriminator class="ch.qos.logback.classic.sift.MDCBasedDiscriminator">
+            <key>userId</key>
+            <defaultValue>unknown</defaultValue>
+        </discriminator>
+
+        <!-- Thêm filter để skip khi userId = null hoặc unknown -->
+        <filter class="ch.qos.logback.core.filter.EvaluatorFilter">
+            <evaluator class="ch.qos.logback.classic.boolex.JaninoEventEvaluator">
+                <expression>
+                    mdc.get("userId") != null
+                </expression>
+            </evaluator>
+            <OnMismatch>DENY</OnMismatch>
+            <OnMatch>NEUTRAL</OnMatch>
+        </filter>
+
+        <sift>
+            <appender name="USER-${userId}" class="ch.qos.logback.core.rolling.RollingFileAppender">
+                <!-- File chính nằm trong thư mục riêng của user -->
+                <file>${LOG_DIR}/users/${userId}/user.log</file>
+                <encoder>
+                    <pattern>${LOG_PATTERN_FILE}</pattern>
+                </encoder>
+                <rollingPolicy class="ch.qos.logback.core.rolling.SizeAndTimeBasedRollingPolicy">
+                    <!-- Các file rotate cũng nằm trong thư mục user riêng -->
+                    <fileNamePattern>${LOG_DIR}/users/${userId}/user-%d{yyyy-MM-dd}.%i.log.gz</fileNamePattern>
+                    <maxFileSize>${LOG_MAX_SIZE}</maxFileSize>
+                    <maxHistory>${LOG_MAX_HISTORY}</maxHistory>
+                    <totalSizeCap>${LOG_MAX_TOTAL_SIZE_CAP}</totalSizeCap>
+                </rollingPolicy>
+            </appender>
+        </sift>
+    </appender>
+
+    <root level="${LOG_LEVEL_INFO}">
+        <appender-ref ref="${LOG_INTO_CONSOLE}"/>
+        <appender-ref ref="${LOG_INTO_FILE}"/>
+        <appender-ref ref="USER-FILE"/>
+    </root>
+</configuration>
