@@ -102,7 +102,7 @@ public class CalculatorUtil {
         return roundValue(token, stepSize, quantityPrecision);
     }
 
-    private static BigDecimal roundValue(double value, double size, int precision) {
+    public static BigDecimal roundValue(double value, double size, int precision) {
         BigDecimal bigValue = BigDecimal.valueOf(value).setScale(precision, RoundingMode.HALF_UP);
         BigDecimal step = BigDecimal.valueOf(size);
 

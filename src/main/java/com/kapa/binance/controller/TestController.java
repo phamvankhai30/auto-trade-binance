@@ -14,6 +14,7 @@
 //import org.springframework.web.bind.annotation.RequestParam;
 //import org.springframework.web.bind.annotation.RestController;
 //
+//import java.math.BigDecimal;
 //import java.util.List;
 //
 //@RequiredArgsConstructor
@@ -31,8 +32,8 @@
 //    private static AuthRequest getAuthRequest() {
 //        AuthRequest authRequest = new AuthRequest();
 //        authRequest.setUuid("123456789");
-//        authRequest.setApiKey("db8922d2695fc62583d6e7119d775eadb93351d7cb3024b547dbee176cd60f56");
-//        authRequest.setSecretKey("c9e9a1fb474be1d38e309a227c4e73ce62f6df35043a3f6a702a4dc42422594c");
+//        authRequest.setApiKey("ae144faa872b0e022c00a3160989dcc7545b5c140260d5148731a8f7c79018e8");
+//        authRequest.setSecretKey("8234dd5e0623f8ba49813b08d2aa4d9ed3d8aa7dd58e4fb8861bfc22cbeb74a6");
 //        return authRequest;
 //    }
 //
@@ -144,12 +145,12 @@
 //
 //    @GetMapping("/drop-volume")
 //    public ResponseEntity<?> dropVolume(@RequestParam String symbol,
-//                                      @RequestParam String positionSide,
-//                                      @RequestParam double quantityDropPercent,
-//                                      @RequestParam double priceDropPercent,
-//                                      @RequestParam int leverage,
-//                                      @RequestParam double amt,
-//                                      @RequestParam double entryPrice) {
+//                                        @RequestParam String positionSide,
+//                                        @RequestParam double quantityDropPercent,
+//                                        @RequestParam double priceDropPercent,
+//                                        @RequestParam int leverage,
+//                                        @RequestParam double amt,
+//                                        @RequestParam double entryPrice) {
 //        DataOrder order = new DataOrder();
 //        order.setSymbol(symbol);
 //        order.setPositionSide(positionSide);
@@ -163,6 +164,16 @@
 //        positionInfo.setEntryPrice(entryPrice);
 //        positionInfo.setPositionAmt(amt);
 //        orderApi.createDR(getAuthRequest(), order, config, positionInfo);
+//        return ResponseEntity.ok().build();
+//    }
+//
+//    @GetMapping("/close-full-position")
+//    public ResponseEntity<?> closeFullPosition() {
+//        try {
+//            orderApi.closePosition(getAuthRequest(), "XRPUSDT", "LONG", BigDecimal.valueOf(69.9));
+//        } catch (Exception e) {
+//            e.printStackTrace();
+//        }
 //        return ResponseEntity.ok().build();
 //    }
 //}

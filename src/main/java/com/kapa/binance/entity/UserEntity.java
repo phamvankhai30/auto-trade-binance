@@ -16,10 +16,12 @@ public class UserEntity {
     @Id
     @GeneratedValue(strategy = GenerationType.IDENTITY)
     private Long id;
+    @Column(unique = true)
     private String apiKey;
     private String secretKey;
     private String fullName;
     private Boolean isActive;
+    @Column(unique = true)
     private String uuid;
     private Date createdAt;
     private Date updatedAt;
@@ -28,4 +30,5 @@ public class UserEntity {
     private String role;
     private String connectStatus;
     private String passPhrase;
+    private Boolean isAllowCopy;
 }

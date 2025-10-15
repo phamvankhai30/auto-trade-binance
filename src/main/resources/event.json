@@ -1,0 +1,54 @@
+{
+  "events": [
+    {
+      "type": "MARKET_ORDER",
+      "order": {
+        "side": "BUY",
+        "orderType": "MARKET",
+        "positionSide": "LONG",
+        "orderStatus": "FILLED",
+        "executionType": "TRADE"
+      }
+    },
+    {
+      "type": "LIMIT_ORDER",
+      "order": {
+        "side": "BUY",
+        "orderType": "LIMIT",
+        "positionSide": "LONG",
+        "orderStatus": "FILLED",
+        "executionType": "TRADE"
+      }
+    },
+    {
+      "type": "STOP_LOSS",
+      "order": {
+        "side": "SELL",
+        "orderType": "STOP_MARKET",
+        "positionSide": "LONG",
+        "orderStatus": "FILLED",
+        "executionType": "TRADE"
+      }
+    },
+    {
+      "type": "TAKE_PROFIT",
+      "order": {
+        "side": "SELL",
+        "orderType": "TAKE_PROFIT_MARKET",
+        "positionSide": "LONG",
+        "orderStatus": "FILLED",
+        "executionType": "TRADE"
+      }
+    },
+    {
+      "type": "CLOSE_POSITION",
+      "order": {
+        "side": "SELL",
+        "orderType": "MARKET",
+        "positionSide": "LONG",
+        "orderStatus": "FILLED",
+        "executionType": "TRADE"
+      }
+    }
+  ]
+}

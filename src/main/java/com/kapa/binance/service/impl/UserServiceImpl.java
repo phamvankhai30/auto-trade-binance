@@ -40,6 +40,7 @@ public class UserServiceImpl implements UserService {
     @Override
     public List<AuthRequest> getAllUserAuth() {
         List<UserEntity> users = userRepository.findAllByActiveIsTrue();
+        String secretKey = envConfig.getSecretKey();
         List<AuthRequest> authRequests = new ArrayList<>();
         for (UserEntity user : users) {
            try {
@@ -49,11 +50,11 @@ public class UserServiceImpl implements UserService {
                AuthRequest auth = new AuthRequest();
                auth.setApiKey(apiKey);
                auth.setUuid(user.getUuid());
-               auth.setSecretKey(AesEncrypt.decrypt(apiSecret, envConfig.getSecretKey()));
+               auth.setSecretKey(AesEncrypt.decrypt(apiSecret, secretKey));
                auth.setIsActive(user.getIsActive());
                authRequests.add(auth);
            } catch (Exception e) {
-               log.error("Error getAllUserAuth decrypting user data for uuid {}: {}", user.getUuid(), e.getMessage());
+               log.error("Error getAllUserAuth uuid {}: {}", user.getUuid(), e.getMessage());
            }
         }
         return authRequests;
@@ -75,7 +76,7 @@ public class UserServiceImpl implements UserService {
                     .isActive(user.getIsActive())
                     .build();
         } catch (Exception e) {
-            log.error("Error getUserAuthByUuid decrypting user data for uuid {}: {}", uuid, e.getMessage());
+            log.error("Error getUserAuthByUuid uuid {}: {}", uuid, e.getMessage());
             return null;
         }
     }

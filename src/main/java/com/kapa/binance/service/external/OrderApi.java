@@ -283,7 +283,7 @@ public class OrderApi {
         }
     }
 
-    private void sendMarketOrder(AuthRequest authRequest, String symbol, String posSide, String side, BigDecimal quantity) {
+    public void sendMarketOrder(AuthRequest authRequest, String symbol, String posSide, String side, BigDecimal quantity) {
         LinkedHashMap<String, Object> params = new LinkedHashMap<>();
         params.put("symbol", symbol);
         params.put("positionSide", posSide);
@@ -341,6 +341,20 @@ public class OrderApi {
         RequestHandler handler = new RequestHandler(restTemplate, authRequest.getApiKey(), authRequest.getSecretKey());
         ResponseEntity<String> response = handler.sendSignedRequest(envConfig.getBaseApi(), "/fapi/v1/order", params, HttpMethod.POST, String.class);
         log.info("SL order placed: {}", response.getBody());
+    }
+
+    public void closePosition(AuthRequest authRequest, String symbol, String posSide, String side, BigDecimal quantity) {
+        LinkedHashMap<String, Object> params = new LinkedHashMap<>();
+        params.put("symbol", symbol);
+        params.put("positionSide", posSide);
+        params.put("side", side);
+        params.put("type", OrderType.MARKET.name());
+        params.put("quantity", quantity);
+        params.put("newClientOrderId", StringUtil.random(CommonConstant.CL));
+
+        RequestHandler handler = new RequestHandler(restTemplate, authRequest.getApiKey(), authRequest.getSecretKey());
+        ResponseEntity<String> response = handler.sendSignedRequest(envConfig.getBaseApi(), "/fapi/v1/order", params, HttpMethod.POST, String.class);
+        log.info("Close pos: {}", response.getBody());
     }
 
     private SymbolInfo getSymbolInfoOrLog(String symbol) {

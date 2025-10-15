@@ -9,7 +9,7 @@
     <property name="LOG_INTO_CONSOLE" value="CONSOLE"/>
     <property name="LOG_INTO_FILE" value="FILE"/>
     <property name="LOG_MAX_SIZE" value="10MB"/>
-    <property name="LOG_MAX_HISTORY" value="3"/>
+    <property name="LOG_MAX_HISTORY" value="7"/>
     <property name="LOG_MAX_TOTAL_SIZE_CAP" value="500MB"/>
     <property name="LOG_PACKAGE_NAME" value="com.kapa.okx"/>
     <property name="LOG_ADDITIVITY" value="false"/>

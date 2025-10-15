@@ -41,8 +41,8 @@ public class BinanceApplication implements CommandLineRunner {
         List<AuthRequest> authRequests = userService.getAllUserAuth();
         if (isDevProfile()) {
             return authRequests.stream()
-//                    .filter(authRequest -> StringUtils.equals("123456789", authRequest.getUuid()))
-                    .filter(authRequest -> StringUtils.equals("987654321", authRequest.getUuid()))
+                    .filter(authRequest -> StringUtils.equals("123456789", authRequest.getUuid()))
+//                    .filter(authRequest -> StringUtils.equals("987654321", authRequest.getUuid()))
                     .toList();
         }
         return authRequests;

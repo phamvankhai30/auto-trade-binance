@@ -11,6 +11,7 @@ import com.kapa.binance.model.dtos.StepConfig;
 import com.kapa.binance.model.response.DataOrder;
 import com.kapa.binance.model.response.PositionInfo;
 import com.kapa.binance.repository.*;
+import com.kapa.binance.service.CopierService;
 import com.kapa.binance.service.OrderService;
 import com.kapa.binance.service.external.AccountApi;
 import com.kapa.binance.service.external.OrderApi;
@@ -37,11 +38,12 @@ public class OrderServiceImpl implements OrderService {
     private final PositionApi positionApi;
     private final OrderApi orderApi;
     private final AccountApi accountApi;
+    private final CopierService copierService;
 
     @Override
     public void receiveMessage(AuthRequest authRequest, String message) {
-        log.info("Message: {}", message);
         if (!StringUtils.contains(message, "ORDER_TRADE_UPDATE")) return;
+        log.info("Message: {}", message);
         DataOrder order = OrderMapper.mapDataOrder(message);
         if (order == null) {
             log.warn("receiveMessage - mapped order is null, skipping");
@@ -49,6 +51,7 @@ public class OrderServiceImpl implements OrderService {
         }
 
         if (isFilledMarketOrLimit(order) || isExpiredTakeProfit(order)) {
+            copierService.sendCopierOrder(order, authRequest);
             handleOrder(authRequest, order);
         } else {
             log.info("receiveMessage order not handled, conditions not met");
@@ -89,7 +92,7 @@ public class OrderServiceImpl implements OrderService {
         log.info("handlePosSideOrder request positionSide={}, originOrderType={}", positionSide, originOrderType);
         if (closingSide.name().equals(positionSide)) {
             log.info("handlePosSideOrder - Detected closing side: {}", positionSide);
-            handleCloseOrder(authRequest, order);
+            handleCloseOrder(authRequest, order); // Đóng position -> cancel các order con còn mở
 
             if (OrderType.TAKE_PROFIT_MARKET.name().equals(originOrderType)) {
                 log.info("handlePosSideOrder - Handling take profit for order type: {}", originOrderType);
@@ -129,6 +132,12 @@ public class OrderServiceImpl implements OrderService {
             return;
         }
 
+        Integer repeatCount = repeatEntity.getRepeatCount();
+        if (repeatCount == null || repeatCount <= 0) {
+            log.info("handleTakeProfit - RepeatCount = {}", repeatCount);
+            return;
+        }
+
         PositionInfo positionInfo = positionApi.getPosition(authRequest, symbol, posSide); // call api
         if (positionInfo != null && positionInfo.getPositionAmt() > 0) {
             log.info("handleTakeProfit - Take profit skipped because positionAmt > 0: {}", positionInfo.getPositionAmt());
@@ -137,6 +146,9 @@ public class OrderServiceImpl implements OrderService {
 
         log.info("handleTakeProfit - Creating market order with volume: {}", repeatEntity.getVolume());
         orderApi.createMarketOrder(authRequest, symbol, posSide, repeatEntity.getVolume()); // call api
+
+        repeatEntity.setRepeatCount(repeatCount - 1);
+        repeatSymbolRepository.save(repeatEntity);
     }
 
     private void handleOpenOrder(AuthRequest authRequest, DataOrder order) {

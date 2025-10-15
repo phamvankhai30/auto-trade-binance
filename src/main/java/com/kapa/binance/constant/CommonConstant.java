@@ -6,4 +6,5 @@ public interface CommonConstant {
     String TP = "TP";
     String DA = "DA";
     String DR = "DR";
+    String CL = "CL";
 }
