@@ -115,6 +115,9 @@ public class ConnectServiceImpl implements ConnectService, DisposableBean {
                 UserConnectionContext existingContext = userContexts.get(uuid);
                 if (existingContext != null) {
                     existingContext.cleanup();
+                    String listenKey = listenKeyApi.create(existingContext.getApiKey());
+                    existingContext.setListenKey(listenKey);
+
                     log.info("Cleaned up existing context for reconnect, uuid: {}", uuid);
                     startConnectionThread(existingContext);
                 }

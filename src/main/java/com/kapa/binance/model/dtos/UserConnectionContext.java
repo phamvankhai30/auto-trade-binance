@@ -40,12 +40,14 @@ public class UserConnectionContext {
         if (renewTask != null && !renewTask.isCancelled()) {
             renewTask.cancel(true);
         }
+        renewTask = null;
     }
 
     private void shutdownScheduler() {
         if (scheduler != null && !scheduler.isShutdown()) {
             scheduler.shutdownNow();
         }
+        scheduler = null;
     }
 
     public void closeSession() {
