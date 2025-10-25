@@ -13,33 +13,49 @@ import com.kapa.binance.service.external.PositionApi;
 import com.kapa.binance.service.external.SymbolApi;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
+import org.slf4j.MDC;
+import org.springframework.scheduling.annotation.Async;
 import org.springframework.stereotype.Service;
 
 import java.math.BigDecimal;
 import java.util.List;
+import java.util.UUID;
 
 @Slf4j
 @Service
 @RequiredArgsConstructor
 public class CopierServiceImpl implements CopierService {
 
+    private static final String KEY_LOG = "userId";
     private final CopierAccountService copierAccountService;
     private final OrderApi orderApi;
     private final PositionApi positionApi;
     private final SymbolApi symbolApi;
 
+    public static void withMDC(String value, Runnable task) {
+        MDC.put(KEY_LOG, value);
+        try {
+            task.run();
+        } finally {
+            MDC.remove(KEY_LOG);
+        }
+    }
+
     @Override
     public void sendCopierOrder(DataOrder dataOrder, AuthRequest leaderAuthRequest) {
-        // 1. Detect leader order type
-        String leaderUuid = leaderAuthRequest.getUuid();
-        String side = dataOrder.getSide();
-        String orderType = dataOrder.getOrderType();
-        String positionSide = dataOrder.getPositionSide();
-        Double leaderQuantity = dataOrder.getOriginalQuantity();
-        String symbol = dataOrder.getSymbol();
-        Boolean closePosition = dataOrder.getIsCloseAll();
+        String requestId = UUID.randomUUID().toString();
+        log.info("---Start sendCopierOrder request id: {} ---", requestId);
 
-        CopyOrderTypeEnum copyOrderType = CopyOrderTypeEnum.detectOrderType(
+        // 1. Detect leader order type
+        final String leaderUuid = leaderAuthRequest.getUuid();
+        final String side = dataOrder.getSide();
+        final String orderType = dataOrder.getOrderType();
+        final String positionSide = dataOrder.getPositionSide();
+        final Double leaderQuantity = dataOrder.getOriginalQuantity();
+        final String symbol = dataOrder.getSymbol();
+        final Boolean closePosition = dataOrder.getIsCloseAll();
+
+        final CopyOrderTypeEnum copyOrderType = CopyOrderTypeEnum.detectOrderType(
                 positionSide, orderType, side, closePosition
         );
 
@@ -53,46 +69,58 @@ public class CopierServiceImpl implements CopierService {
         log.info("Leader {} have {} copier", leaderUuid, copiers.size());
         if (copiers.isEmpty()) return;
 
-        PositionInfo leaderPosition = null;
-        SymbolInfo symbolInfo = null;
+        final PositionInfo leaderPosition;
+        final SymbolInfo symbolInfo;
         if (CopyOrderTypeEnum.CLOSE_POSITION.equals(copyOrderType)) {
             leaderPosition = positionApi.getPosition(leaderAuthRequest, symbol, positionSide);
             symbolInfo = symbolApi.getSymbolInfo(symbol);
+        } else {
+            leaderPosition = null;
+            symbolInfo = null;
         }
 
         for (AuthRequest authRequest : copiers) {
             handleCopierOrder(copyOrderType, authRequest, leaderPosition, symbolInfo,
-                    symbol, positionSide, side, leaderQuantity);
+                    symbol, positionSide, side, leaderQuantity, requestId);
         }
+
+        log.info("---End sendCopierOrder request id: {} ---", requestId);
     }
 
     /**
      * Xử lý đặt lệnh cho từng copier dựa trên loại order
      */
-    private void handleCopierOrder(CopyOrderTypeEnum type, AuthRequest authRequest, PositionInfo leaderPosition,
+    @Async("copierExecutor")
+    public void handleCopierOrder(CopyOrderTypeEnum type, AuthRequest authRequest, PositionInfo leaderPosition,
                                    SymbolInfo symbolInfo,
-                                   String symbol, String positionSide, String side, Double leaderQuantity
+                                  String symbol, String positionSide, String side, Double leaderQuantity,
+                                  String requestId
     ) {
-        switch (type) {
-            // Tang leaderQuantity
-            case MARKET_ORDER, LIMIT_ORDER:
-                openOrder(authRequest, symbol, positionSide, side, leaderQuantity);
-                break;
+        final String copierId = authRequest.getUuid();
+        withMDC(copierId, () -> {
+            log.info("---Start Copier request id: {} ---", requestId);
+            switch (type) {
+                // Tang leaderQuantity
+                case MARKET_ORDER, LIMIT_ORDER:
+                    openOrder(authRequest, symbol, positionSide, side, leaderQuantity);
+                    break;
 
-            // Dong toan bo position
-            case STOP_LOSS, TAKE_PROFIT:
-                closeAllPosition(authRequest, symbol, positionSide, side);
-                break;
+                // Dong toan bo position
+                case STOP_LOSS, TAKE_PROFIT:
+                    closeAllPosition(authRequest, symbol, positionSide, side);
+                    break;
 
-            // Giam position 1 phan or toan bo
-            case CLOSE_POSITION:
-                closePartialPosition(authRequest, leaderPosition, symbolInfo,
-                        symbol, positionSide, side, leaderQuantity);
-                break;
+                // Giam position 1 phan or toan bo
+                case CLOSE_POSITION:
+                    closePartialPosition(authRequest, leaderPosition, symbolInfo,
+                            symbol, positionSide, side, leaderQuantity);
+                    break;
 
-            default:
-                log.warn("UNKNOWN order type, skipping...");
-        }
+                default:
+                    log.warn("UNKNOWN order type, skipping...");
+            }
+            log.info("---End Copier request id: {} ---", requestId);
+        });
     }
 
     private void openOrder(AuthRequest authRequest, String symbol, String posSide, String side, Double leaderQuantity) {

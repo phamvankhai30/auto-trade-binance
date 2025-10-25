@@ -90,11 +90,21 @@ public class ConnectServiceImpl implements ConnectService, DisposableBean {
         UserConnectionContext userConnectionContext = userContexts.get(uuid);
         if (userConnectionContext != null) {
             userConnectionContext.closeSession();
+            userContexts.remove(uuid);
             log.info("Close connect uuid: {}", uuid);
         } else {
             log.warn("No active connection found for uuid: {}", uuid);
             throw new Ex422("Not found user connect: " + uuid);
         }
+    }
+
+    @Override
+    public void apiResetConnect(ConnectRequest request) {
+        String uuid = request.getUuid();
+        log.info("Start reset leader uuid: {}", uuid);
+        apiCloseConnect(uuid);
+        apiOpenConnect(request);
+        log.info("End reset leader uuid: {}", uuid);
     }
 
     @Override

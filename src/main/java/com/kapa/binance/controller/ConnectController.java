@@ -30,4 +30,11 @@ public class ConnectController {
         connectService.apiCloseConnect(request.getUuid());
         return BaseResponse.success();
     }
+
+    @PreAuthorize("@authService.authorize('ADMIN')")
+    @PostMapping("/reset")
+    public BaseResponse<?> resetConnect(@RequestBody @Valid ConnectRequest request) {
+        connectService.apiResetConnect(request);
+        return BaseResponse.success();
+    }
 }

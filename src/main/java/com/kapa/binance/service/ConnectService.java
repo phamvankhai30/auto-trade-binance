@@ -12,6 +12,8 @@ public interface ConnectService {
 
     void apiCloseConnect(String uuid);
 
+    void apiResetConnect(ConnectRequest request);
+
     CompletableFuture<ConnectionResponse> openConnect(AuthRequest request, boolean isReconnect);
 
 }

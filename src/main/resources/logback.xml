@@ -78,6 +78,40 @@
         </sift>
     </appender>
 
+    <!-- Log riêng từng copier -->
+    <appender name="COPIER-FILE" class="ch.qos.logback.classic.sift.SiftingAppender">
+        <discriminator class="ch.qos.logback.classic.sift.MDCBasedDiscriminator">
+            <key>copierId</key>
+            <defaultValue>unknown</defaultValue>
+        </discriminator>
+
+        <!-- Chỉ ghi log khi copierId có giá trị -->
+        <filter class="ch.qos.logback.core.filter.EvaluatorFilter">
+            <evaluator class="ch.qos.logback.classic.boolex.JaninoEventEvaluator">
+                <expression>
+                    mdc.get("copierId") != null
+                </expression>
+            </evaluator>
+            <OnMismatch>DENY</OnMismatch>
+            <OnMatch>NEUTRAL</OnMatch>
+        </filter>
+
+        <sift>
+            <appender name="COPIER-${copierId}" class="ch.qos.logback.core.rolling.RollingFileAppender">
+                <file>${LOG_DIR}/copiers/${copierId}/copier.log</file>
+                <encoder>
+                    <pattern>${LOG_PATTERN_FILE}</pattern>
+                </encoder>
+                <rollingPolicy class="ch.qos.logback.core.rolling.SizeAndTimeBasedRollingPolicy">
+                    <fileNamePattern>${LOG_DIR}/copiers/${copierId}/copier-%d{yyyy-MM-dd}.%i.log.gz</fileNamePattern>
+                    <maxFileSize>${LOG_MAX_SIZE}</maxFileSize>
+                    <maxHistory>${LOG_MAX_HISTORY}</maxHistory>
+                    <totalSizeCap>${LOG_MAX_TOTAL_SIZE_CAP}</totalSizeCap>
+                </rollingPolicy>
+            </appender>
+        </sift>
+    </appender>
+
     <root level="${LOG_LEVEL_INFO}">
         <appender-ref ref="${LOG_INTO_CONSOLE}"/>
         <appender-ref ref="${LOG_INTO_FILE}"/>

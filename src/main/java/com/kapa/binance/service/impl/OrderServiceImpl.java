@@ -1,5 +1,7 @@
 package com.kapa.binance.service.impl;
 
+import com.fasterxml.jackson.databind.JsonNode;
+import com.fasterxml.jackson.databind.ObjectMapper;
 import com.kapa.binance.base.utils.OrderMapper;
 import com.kapa.binance.base.utils.StringUtil;
 import com.kapa.binance.base.utils.ValidationUtil;
@@ -21,6 +23,7 @@ import lombok.extern.slf4j.Slf4j;
 import org.apache.commons.lang3.StringUtils;
 import org.springframework.stereotype.Service;
 
+import java.time.LocalDateTime;
 import java.util.Date;
 import java.util.List;
 
@@ -39,9 +42,16 @@ public class OrderServiceImpl implements OrderService {
     private final OrderApi orderApi;
     private final AccountApi accountApi;
     private final CopierService copierService;
+    private final ObjectMapper objectMapper;
+    private final LogLeverRepository logLeverRepository;
 
     @Override
     public void receiveMessage(AuthRequest authRequest, String message) {
+        if (StringUtils.contains(message, "ACCOUNT_CONFIG_UPDATE")) {
+            updateLever(authRequest.getUuid(), message);
+            return;
+        }
+
         if (!StringUtils.contains(message, "ORDER_TRADE_UPDATE")) return;
         log.info("Message: {}", message);
         DataOrder order = OrderMapper.mapDataOrder(message);
@@ -55,6 +65,38 @@ public class OrderServiceImpl implements OrderService {
             handleOrder(authRequest, order);
         } else {
             log.info("receiveMessage order not handled, conditions not met");
+        }
+    }
+
+    private void updateLever(String uuid, String message) {
+        try {
+            JsonNode acNode = objectMapper.readTree(message).path("ac");
+            String symbol = acNode.path("s").asText(null);
+            int leverage = acNode.path("l").asInt(-1);
+
+            if (symbol == null || leverage < 0) {
+                log.warn("Invalid leverage update message: {}", message);
+                return;
+            }
+
+            LocalDateTime now = LocalDateTime.now();
+
+            LogLeverEntity entity = logLeverRepository.findByUuidAndSymbol(uuid, symbol)
+                    .orElseGet(() -> {
+                        LogLeverEntity newEntity = new LogLeverEntity();
+                        newEntity.setUuid(uuid);
+                        newEntity.setSymbol(symbol);
+                        newEntity.setCreatedAt(now);
+                        return newEntity;
+                    });
+
+            entity.setLever(leverage);
+            entity.setUpdatedAt(now);
+
+            logLeverRepository.save(entity);
+
+        } catch (Exception e) {
+            log.error("Error updating leverage for uuid {}: {}", uuid, e.getMessage(), e);
         }
     }
 
