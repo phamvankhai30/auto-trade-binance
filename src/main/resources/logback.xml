@@ -116,5 +116,6 @@
         <appender-ref ref="${LOG_INTO_CONSOLE}"/>
         <appender-ref ref="${LOG_INTO_FILE}"/>
         <appender-ref ref="USER-FILE"/>
+        <appender-ref ref="COPIER-FILE"/>
     </root>
 </configuration>
