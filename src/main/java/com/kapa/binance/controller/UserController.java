@@ -13,6 +13,8 @@ import org.springframework.http.ResponseEntity;
 import org.springframework.security.access.prepost.PreAuthorize;
 import org.springframework.web.bind.annotation.*;
 
+import java.time.LocalDateTime;
+
 @RestController
 @RequestMapping("/users")
 @RequiredArgsConstructor
@@ -45,6 +47,9 @@ public class UserController {
                 .copierUuid(req.getCopierUuid().trim())
                 .leaderUuid(req.getLeaderUuid().trim())
                 .isActive(req.getIsActive())
+                .copierRatio(req.getCopierRatio())
+                .fullName(req.getFullName().trim())
+                .createdAt(LocalDateTime.now())
                 .build();
         copierAccountRepository.save(entity);
         return ResponseEntity.ok(entity);

@@ -7,4 +7,6 @@ import java.util.List;
 public interface CopierAccountService {
 
     List<AuthRequest> getCopierAuthByLeader(String leaderUuid);
+
+    AuthRequest getCopierAuthByCopier(String copierUuid);
 }

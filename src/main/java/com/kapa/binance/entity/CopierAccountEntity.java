@@ -3,6 +3,8 @@ package com.kapa.binance.entity;
 import jakarta.persistence.*;
 import lombok.*;
 
+import java.time.LocalDateTime;
+
 @Getter
 @Setter
 @NoArgsConstructor
@@ -29,5 +31,12 @@ public class CopierAccountEntity {
     @Column(nullable = false)
     private String leaderUuid;
 
+    private String fullName;
+
     private Double copierRatio;
+
+    private LocalDateTime createdAt;
+
+    private String updatedAt;
+
 }

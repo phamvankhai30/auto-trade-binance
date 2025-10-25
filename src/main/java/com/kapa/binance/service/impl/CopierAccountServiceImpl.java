@@ -38,11 +38,36 @@ public class CopierAccountServiceImpl implements CopierAccountService {
                 a.setSecretKey(AesEncrypt.decrypt(apiSecret, secretKey));
                 a.setIsActive(c.getIsActive());
                 a.setCopierRatio(c.getCopierRatio());
+                a.setFullName(c.getFullName());
                 auth.add(a);
             } catch (Exception e) {
                 log.error("Error getCopierAuth copier uuid {}: {}", c.getCopierUuid(), e.getMessage());
             }
         }
         return auth;
+    }
+
+    @Override
+    public AuthRequest getCopierAuthByCopier(String copierUuid) {
+        CopierAccountEntity c = copierAccountRepository.findByCopierUuid(copierUuid)
+                .orElseThrow(() -> new RuntimeException("Copier account not found"));
+
+        String secretKey = envConfig.getSecretKey();
+        try {
+            String apiKey = c.getApiKey();
+            String apiSecret = c.getSecretKey();
+
+            AuthRequest a = new AuthRequest();
+            a.setApiKey(apiKey);
+            a.setUuid(c.getCopierUuid());
+            a.setSecretKey(AesEncrypt.decrypt(apiSecret, secretKey));
+            a.setIsActive(c.getIsActive());
+            a.setCopierRatio(c.getCopierRatio());
+            a.setFullName(c.getFullName());
+            return a;
+        } catch (Exception e) {
+            log.error("Error getCopierAuthByCopier copier uuid {}: {}", c.getCopierUuid(), e.getMessage());
+            throw new RuntimeException("Error decrypting copier account credentials");
+        }
     }
 }

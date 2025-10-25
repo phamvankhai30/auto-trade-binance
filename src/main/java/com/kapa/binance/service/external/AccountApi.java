@@ -62,4 +62,57 @@ public class AccountApi {
             return 0.0;
         }
     }
+
+    public void changeLeverage(AuthRequest authRequest, String symbol, Integer leverage) {
+        try {
+            log.info("Changing leverage for symbol: {} to {}", symbol, leverage);
+            RequestHandler requestHandler = new RequestHandler(restTemplate, authRequest.getApiKey(), authRequest.getSecretKey());
+            LinkedHashMap<String, Object> params = new LinkedHashMap<>();
+            params.put("symbol", symbol);
+            params.put("leverage", leverage);
+
+            ResponseEntity<LinkedHashMap<String, Object>> response = requestHandler.sendSignedRequest(
+                    envConfig.getBaseApi(),
+                    "/fapi/v1/leverage",
+                    params,
+                    HttpMethod.POST,
+                    new ParameterizedTypeReference<>() {}
+            );
+
+            if (response.getStatusCode().is2xxSuccessful() && response.getBody() != null) {
+                log.info("Leverage changed successfully to");
+            }
+            log.error("Failed to change leverage: {} {}", response.getStatusCode(), response.getBody());
+        } catch (Exception e) {
+            log.error("Error changing leverage: {}", e.getMessage());
+        }
+    }
+
+    public Integer getLeverage(AuthRequest authRequest, String symbol) {
+        try {
+            log.info("Fetching leverage for symbol: {}", symbol);
+            RequestHandler requestHandler = new RequestHandler(restTemplate, authRequest.getApiKey(), authRequest.getSecretKey());
+            LinkedHashMap<String, Object> params = new LinkedHashMap<>();
+            params.put("symbol", symbol);
+
+            ResponseEntity<LinkedHashMap<String, Object>> response = requestHandler.sendSignedRequest(
+                    envConfig.getBaseApi(),
+                    "/fapi/v1/leverage",
+                    params,
+                    HttpMethod.GET,
+                    new ParameterizedTypeReference<>() {}
+            );
+
+            if (response.getStatusCode().is2xxSuccessful() && response.getBody() != null) {
+                Integer leverage = (Integer) response.getBody().get("leverage");
+                log.info("Fetched leverage successfully: {}", leverage);
+                return leverage;
+            }
+            log.error("Failed to fetch leverage: {} {}", response.getStatusCode(), response.getBody());
+        } catch (Exception e) {
+            log.error("Error fetching leverage: {}", e.getMessage());
+        }
+        return null;
+    }
+
 }

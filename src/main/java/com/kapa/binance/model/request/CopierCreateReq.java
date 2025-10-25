@@ -1,7 +1,6 @@
 package com.kapa.binance.model.request;
 
-import jakarta.validation.constraints.NotBlank;
-import jakarta.validation.constraints.NotNull;
+import jakarta.validation.constraints.*;
 import lombok.AllArgsConstructor;
 import lombok.Builder;
 import lombok.Data;
@@ -27,4 +26,12 @@ public class CopierCreateReq {
 
     @NotNull
     private Boolean isActive;
+
+    @NotNull
+    @Positive
+    @Max(10)
+    private Double copierRatio;
+
+    @NotBlank
+    private String fullName;
 }
