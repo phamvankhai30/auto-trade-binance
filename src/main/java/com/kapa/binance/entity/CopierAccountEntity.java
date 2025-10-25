@@ -28,4 +28,6 @@ public class CopierAccountEntity {
 
     @Column(nullable = false)
     private String leaderUuid;
+
+    private Double copierRatio;
 }

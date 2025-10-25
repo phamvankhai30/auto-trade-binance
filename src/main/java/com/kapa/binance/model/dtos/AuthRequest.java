@@ -13,4 +13,5 @@ public class AuthRequest {
     private String secretKey;
     private String uuid;
     private Boolean isActive;
+    private Double copierRatio;
 }

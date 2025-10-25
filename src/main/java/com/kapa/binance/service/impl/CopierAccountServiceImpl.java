@@ -37,6 +37,7 @@ public class CopierAccountServiceImpl implements CopierAccountService {
                 a.setUuid(c.getCopierUuid());
                 a.setSecretKey(AesEncrypt.decrypt(apiSecret, secretKey));
                 a.setIsActive(c.getIsActive());
+                a.setCopierRatio(c.getCopierRatio());
                 auth.add(a);
             } catch (Exception e) {
                 log.error("Error getCopierAuth copier uuid {}: {}", c.getCopierUuid(), e.getMessage());

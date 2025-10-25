@@ -99,10 +99,22 @@ public class CopierServiceImpl implements CopierService {
         final String copierId = authRequest.getUuid();
         withMDC(copierId, () -> {
             log.info("---Start Copier request id: {} ---", requestId);
+            Double copierRatio = authRequest.getCopierRatio();
+            double leaderQuantityAdjusted;
+            if (copierRatio == null || copierRatio <= 0) {
+                leaderQuantityAdjusted = leaderQuantity * 1.0;
+                log.warn("Copier uuid {} has invalid copierRatio {}, default to 1.0",
+                        copierId, copierRatio);
+            } else {
+                leaderQuantityAdjusted = leaderQuantity * copierRatio;
+                log.info("Copier uuid {} adjusted leaderQuantity {} with ratio {} => {}",
+                        copierId, leaderQuantity, copierRatio, leaderQuantityAdjusted);
+            }
+            
             switch (type) {
                 // Tang leaderQuantity
                 case MARKET_ORDER, LIMIT_ORDER:
-                    openOrder(authRequest, symbol, positionSide, side, leaderQuantity);
+                    openOrder(authRequest, symbol, positionSide, side, leaderQuantityAdjusted);
                     break;
 
                 // Dong toan bo position
@@ -113,7 +125,7 @@ public class CopierServiceImpl implements CopierService {
                 // Giam position 1 phan or toan bo
                 case CLOSE_POSITION:
                     closePartialPosition(authRequest, leaderPosition, symbolInfo,
-                            symbol, positionSide, side, leaderQuantity);
+                            symbol, positionSide, side, leaderQuantityAdjusted);
                     break;
 
                 default:
