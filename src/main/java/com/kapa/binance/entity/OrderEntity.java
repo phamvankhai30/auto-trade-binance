@@ -9,7 +9,13 @@ import java.util.Date;
 @Getter
 @Setter
 @Entity
-@Table(name = "orders")
+@Table(name = "orders", indexes = {
+        @Index(name = "idx_uuid", columnList = "uuid"),
+        @Index(name = "idx_clientIdParent", columnList = "clientIdParent"),
+        @Index(name = "idx_clientIdChildren", columnList = "clientIdChildren"),
+        @Index(name = "idx_symbol", columnList = "symbol"),
+        @Index(name = "idx_posSide", columnList = "posSide")
+})
 public class OrderEntity {
 
     @Id

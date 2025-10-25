@@ -9,7 +9,11 @@ import lombok.*;
 @AllArgsConstructor
 @Builder
 @Entity
-@Table(name = "repeat_symbol")
+@Table(name = "repeat_symbol", indexes = {
+        @Index(name = "idx_uuid", columnList = "uuid"),
+        @Index(name = "idx_symbol", columnList = "symbol"),
+        @Index(name = "idx_posSide", columnList = "posSide")
+})
 public class RepeatSymbolEntity {
     @Id
     @GeneratedValue(strategy = GenerationType.IDENTITY)

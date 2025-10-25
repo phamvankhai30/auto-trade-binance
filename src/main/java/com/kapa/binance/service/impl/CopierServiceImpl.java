@@ -82,7 +82,8 @@ public class CopierServiceImpl implements CopierService {
         }
 
         Integer leaderLeverage = null;
-        if (CopyOrderTypeEnum.MARKET_ORDER.equals(copyOrderType)) {
+        if (CopyOrderTypeEnum.MARKET_ORDER.equals(copyOrderType) ||
+                CopyOrderTypeEnum.LIMIT_ORDER.equals(copyOrderType)) {
             PositionInfo p = positionApi.getPositionInfo(leaderAuthRequest, symbol, positionSide);
             if (p != null) {
                 leaderLeverage = p.getLeverage();
@@ -127,11 +128,8 @@ public class CopierServiceImpl implements CopierService {
             
             switch (type) {
                 // Tang leaderQuantity
-                case MARKET_ORDER:
+                case MARKET_ORDER, LIMIT_ORDER:
                     updateLever(authRequest, leaderLeverage, symbol, positionSide);
-                    openOrder(authRequest, symbol, positionSide, side, leaderQuantityAdjusted);
-                    break;
-                case LIMIT_ORDER:
                     openOrder(authRequest, symbol, positionSide, side, leaderQuantityAdjusted);
                     break;
 

@@ -37,6 +37,6 @@ public class CopierAccountEntity {
 
     private LocalDateTime createdAt;
 
-    private String updatedAt;
+    private LocalDateTime updatedAt;
 
 }

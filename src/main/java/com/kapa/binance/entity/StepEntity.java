@@ -9,7 +9,10 @@ import lombok.*;
 @AllArgsConstructor
 @Builder
 @Entity
-@Table(name = "steps")
+@Table(name = "steps", indexes = {
+        @Index(name = "idx_uuid", columnList = "uuid"),
+        @Index(name = "idx_step", columnList = "step")
+})
 public class StepEntity {
     @Id
     @GeneratedValue(strategy = GenerationType.IDENTITY)

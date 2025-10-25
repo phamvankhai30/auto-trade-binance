@@ -4,7 +4,6 @@ import com.fasterxml.jackson.databind.JsonNode;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import com.kapa.binance.base.utils.OrderMapper;
 import com.kapa.binance.base.utils.StringUtil;
-import com.kapa.binance.base.utils.ValidationUtil;
 import com.kapa.binance.constant.CommonConstant;
 import com.kapa.binance.entity.*;
 import com.kapa.binance.enums.*;
@@ -15,7 +14,6 @@ import com.kapa.binance.model.response.PositionInfo;
 import com.kapa.binance.repository.*;
 import com.kapa.binance.service.CopierService;
 import com.kapa.binance.service.OrderService;
-import com.kapa.binance.service.external.AccountApi;
 import com.kapa.binance.service.external.OrderApi;
 import com.kapa.binance.service.external.PositionApi;
 import lombok.RequiredArgsConstructor;
@@ -36,11 +34,11 @@ public class OrderServiceImpl implements OrderService {
     private final OrderRepository orderRepository;
     private final StepRepository stepRepository;
     private final StepSymbolRepository stepSymbolRepository;
-    private final MaxVolSymbolRepository maxVolSymbolRepository;
-    private final MaxVolRepository maxVolRepository;
+//    private final MaxVolSymbolRepository maxVolSymbolRepository;
+//    private final MaxVolRepository maxVolRepository;
+//    private final AccountApi accountApi;
     private final PositionApi positionApi;
     private final OrderApi orderApi;
-    private final AccountApi accountApi;
     private final CopierService copierService;
     private final ObjectMapper objectMapper;
     private final LogLeverRepository logLeverRepository;
@@ -393,6 +391,7 @@ public class OrderServiceImpl implements OrderService {
         }
     }
 
+    /*
     private boolean checkMaxVolume(AuthRequest auth, String symbol, String posSide, Double usdt) {
         Double balance = accountApi.getBalance(auth);
         if (ValidationUtil.isNulOrZero(balance)) return true;
@@ -456,4 +455,5 @@ public class OrderServiceImpl implements OrderService {
                 bothVol, total + usdt, bl * bothVol, result);
         return result;
     }
+    */
 }
