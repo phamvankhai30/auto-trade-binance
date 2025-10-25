@@ -316,10 +316,11 @@ public class OrderServiceImpl implements OrderService {
     private void createOrUpdateOrder(AuthRequest authRequest, DataOrder order, StepConfig config, PositionInfo positionInfo) {
         String randomId = StringUtil.random(CommonConstant.DA);
 
-        if (!checkMaxVolume(authRequest, order.getSymbol(), order.getPositionSide(), config.getUsdt())) {
-            orderApi.createDca(authRequest, order, config, positionInfo, randomId);
-        }
+//        if (!checkMaxVolume(authRequest, order.getSymbol(), order.getPositionSide(), config.getUsdt())) {
+//            orderApi.createDca(authRequest, order, config, positionInfo, randomId);
+//        }
 
+        orderApi.createDca(authRequest, order, config, positionInfo, randomId);
         slAndTpAndDr(authRequest, order, config, positionInfo);
         saveOrder(authRequest, order, randomId, config.getStep(), config.getUsdt());
     }
@@ -327,9 +328,10 @@ public class OrderServiceImpl implements OrderService {
     private void slAndTpAndDr(AuthRequest authRequest, DataOrder order, StepConfig config, PositionInfo positionInfo) {
         orderApi.createTP(authRequest, order, config, positionInfo);
         orderApi.createSL(authRequest, order, config, positionInfo);
-        if (config.getStep() != 1){
-            orderApi.createDR(authRequest, order, config, positionInfo);
-        }
+
+//        if (config.getStep() != 1){
+//            orderApi.createDR(authRequest, order, config, positionInfo);
+//        }
     }
 
     private void saveOrder(AuthRequest authRequest, DataOrder order, String randomId, int step, Double vol) {
