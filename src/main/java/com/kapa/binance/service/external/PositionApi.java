@@ -57,4 +57,40 @@ public class PositionApi {
         }
         return new ArrayList<>();
     }
+
+
+    public PositionInfo getPositionInfo(AuthRequest authRequest, String symbol, String positionSide) {
+        try {
+            RequestHandler requestHandler = new RequestHandler(
+                    restTemplate,
+                    authRequest.getApiKey(),
+                    authRequest.getSecretKey()
+            );
+
+            LinkedHashMap<String, Object> param = new LinkedHashMap<>();
+            if (!StringUtils.isEmpty(symbol)) {
+                param.put("symbol", symbol.trim().toUpperCase());
+            }
+
+            ResponseEntity<List<PositionInfo>> response = requestHandler.sendSignedRequest(
+                    envConfig.getBaseApi(),
+                    "/fapi/v2/positionRisk",
+                    param,
+                    HttpMethod.GET,
+                    new ParameterizedTypeReference<>() {}
+            );
+
+            if (response.getStatusCode().is2xxSuccessful() && response.getBody() != null) {
+                return response.getBody().stream()
+                        .filter(pos -> symbol == null || pos.getSymbol().equalsIgnoreCase(symbol))
+                        .filter(pos -> positionSide == null || pos.getPositionSide().equalsIgnoreCase(positionSide))
+                        .findFirst()
+                        .orElse(null);
+            }
+        } catch (Exception e) {
+            log.error("Error fetching position for symbol {} side {}: {}", symbol, positionSide, e.getMessage(), e);
+        }
+        return null;
+    }
+
 }

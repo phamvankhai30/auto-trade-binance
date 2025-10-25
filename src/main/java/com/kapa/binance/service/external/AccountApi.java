@@ -87,32 +87,4 @@ public class AccountApi {
             log.error("Error changing leverage: {}", e.getMessage());
         }
     }
-
-    public Integer getLeverage(AuthRequest authRequest, String symbol) {
-        try {
-            log.info("Fetching leverage for symbol: {}", symbol);
-            RequestHandler requestHandler = new RequestHandler(restTemplate, authRequest.getApiKey(), authRequest.getSecretKey());
-            LinkedHashMap<String, Object> params = new LinkedHashMap<>();
-            params.put("symbol", symbol);
-
-            ResponseEntity<LinkedHashMap<String, Object>> response = requestHandler.sendSignedRequest(
-                    envConfig.getBaseApi(),
-                    "/fapi/v1/leverage",
-                    params,
-                    HttpMethod.GET,
-                    new ParameterizedTypeReference<>() {}
-            );
-
-            if (response.getStatusCode().is2xxSuccessful() && response.getBody() != null) {
-                Integer leverage = (Integer) response.getBody().get("leverage");
-                log.info("Fetched leverage successfully: {}", leverage);
-                return leverage;
-            }
-            log.error("Failed to fetch leverage: {} {}", response.getStatusCode(), response.getBody());
-        } catch (Exception e) {
-            log.error("Error fetching leverage: {}", e.getMessage());
-        }
-        return null;
-    }
-
 }

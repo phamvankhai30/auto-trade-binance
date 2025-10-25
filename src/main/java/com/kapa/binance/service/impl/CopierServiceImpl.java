@@ -8,6 +8,7 @@ import com.kapa.binance.model.response.PositionInfo;
 import com.kapa.binance.model.response.SymbolInfo;
 import com.kapa.binance.service.CopierAccountService;
 import com.kapa.binance.service.CopierService;
+import com.kapa.binance.service.external.AccountApi;
 import com.kapa.binance.service.external.OrderApi;
 import com.kapa.binance.service.external.PositionApi;
 import com.kapa.binance.service.external.SymbolApi;
@@ -31,6 +32,7 @@ public class CopierServiceImpl implements CopierService {
     private final OrderApi orderApi;
     private final PositionApi positionApi;
     private final SymbolApi symbolApi;
+    private final AccountApi accountApi;
 
     public static void withMDC(String value, Runnable task) {
         MDC.put(KEY_LOG, value);
@@ -79,9 +81,21 @@ public class CopierServiceImpl implements CopierService {
             symbolInfo = null;
         }
 
+        Integer leaderLeverage = null;
+        if (CopyOrderTypeEnum.MARKET_ORDER.equals(copyOrderType)) {
+            PositionInfo p = positionApi.getPositionInfo(leaderAuthRequest, symbol, positionSide);
+            if (p != null) {
+                leaderLeverage = p.getLeverage();
+            } else {
+                log.warn("Leader {} has no position info to get leverage for symbol {} posSide {}",
+                        leaderUuid, symbol, positionSide);
+                return;
+            }
+        }
+
         for (AuthRequest authRequest : copiers) {
             handleCopierOrder(copyOrderType, authRequest, leaderPosition, symbolInfo,
-                    symbol, positionSide, side, leaderQuantity, requestId);
+                    symbol, positionSide, side, leaderQuantity, requestId, leaderLeverage);
         }
 
         log.info("---End sendCopierOrder request id: {} ---", requestId);
@@ -94,7 +108,7 @@ public class CopierServiceImpl implements CopierService {
     public void handleCopierOrder(CopyOrderTypeEnum type, AuthRequest authRequest, PositionInfo leaderPosition,
                                    SymbolInfo symbolInfo,
                                   String symbol, String positionSide, String side, Double leaderQuantity,
-                                  String requestId
+                                  String requestId, Integer leaderLeverage
     ) {
         final String copierId = authRequest.getUuid();
         withMDC(copierId, () -> {
@@ -113,7 +127,11 @@ public class CopierServiceImpl implements CopierService {
             
             switch (type) {
                 // Tang leaderQuantity
-                case MARKET_ORDER, LIMIT_ORDER:
+                case MARKET_ORDER:
+                    updateLever(authRequest, leaderLeverage, symbol, positionSide);
+                    openOrder(authRequest, symbol, positionSide, side, leaderQuantityAdjusted);
+                    break;
+                case LIMIT_ORDER:
                     openOrder(authRequest, symbol, positionSide, side, leaderQuantityAdjusted);
                     break;
 
@@ -133,6 +151,22 @@ public class CopierServiceImpl implements CopierService {
             }
             log.info("---End Copier request id: {} ---", requestId);
         });
+    }
+
+    private void updateLever(AuthRequest authRequest, Integer leverage, String symbol, String posSide) {
+        try {
+            PositionInfo p = positionApi.getPositionInfo(authRequest, symbol, posSide);
+            if (p != null && p.getPositionAmt() == 0 && (int) leverage != p.getLeverage()) {
+                accountApi.changeLeverage(authRequest, symbol, leverage);
+                log.info("Copier uuid {} change leverage to {} for symbol {} posSide {}",
+                        authRequest.getUuid(), leverage, symbol, posSide);
+            } else {
+                log.info("Copier uuid {} has open position, skip change leverage for symbol {} posSide {}",
+                        authRequest.getUuid(), symbol, posSide);
+            }
+        } catch (Exception e) {
+            log.error("Copier uuid {} initLeverage Error: {}", authRequest.getUuid(), e.getMessage());
+        }
     }
 
     private void openOrder(AuthRequest authRequest, String symbol, String posSide, String side, Double leaderQuantity) {
