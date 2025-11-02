@@ -14,6 +14,7 @@ import com.kapa.binance.model.response.PositionInfo;
 import com.kapa.binance.repository.*;
 import com.kapa.binance.service.CopierService;
 import com.kapa.binance.service.OrderService;
+import com.kapa.binance.service.SendTelegramService;
 import com.kapa.binance.service.external.OrderApi;
 import com.kapa.binance.service.external.PositionApi;
 import lombok.RequiredArgsConstructor;
@@ -42,6 +43,7 @@ public class OrderServiceImpl implements OrderService {
     private final CopierService copierService;
     private final ObjectMapper objectMapper;
     private final LogLeverRepository logLeverRepository;
+    private final SendTelegramService sendTelegramService;
 
     @Override
     public void receiveMessage(AuthRequest authRequest, String message) {
@@ -136,6 +138,7 @@ public class OrderServiceImpl implements OrderService {
 
             if (OrderType.TAKE_PROFIT_MARKET.name().equals(originOrderType)) {
                 log.info("handlePosSideOrder - Handling take profit for order type: {}", originOrderType);
+                sendTelegramService.sendTakeProfitMessage(authRequest, order);
                 handleTakeProfit(authRequest, order);
             }
         } else if (openingSide.name().equals(positionSide)) {

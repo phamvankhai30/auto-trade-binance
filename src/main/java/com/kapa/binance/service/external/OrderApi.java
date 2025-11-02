@@ -1,6 +1,7 @@
 package com.kapa.binance.service.external;
 
 import com.fasterxml.jackson.databind.ObjectMapper;
+import com.kapa.binance.base.exception.Ex400;
 import com.kapa.binance.base.response.OrderInfo;
 import com.kapa.binance.base.utils.CalculatorUtil;
 import com.kapa.binance.base.utils.StringUtil;
@@ -26,10 +27,7 @@ import org.springframework.stereotype.Service;
 import org.springframework.web.client.RestTemplate;
 
 import java.math.BigDecimal;
-import java.util.Collections;
-import java.util.LinkedHashMap;
-import java.util.List;
-import java.util.Optional;
+import java.util.*;
 import java.util.stream.Collectors;
 
 @Slf4j
@@ -179,6 +177,70 @@ public class OrderApi {
         }
     }
 
+    public void retryDca(AuthRequest authRequest, String symbol, String posSide,
+                         Double entryPrice, Double roi, Integer lever, Double usdt, String clientId) {
+        try {
+            Objects.requireNonNull(authRequest, "AuthRequest cannot be null");
+            if (StringUtils.isBlank(authRequest.getUuid())) {
+                throw new Ex400("Invalid user: uuid is blank.");
+            }
+
+            if (StringUtils.isBlank(symbol)) {
+                throw new Ex400("Symbol cannot be blank.");
+            }
+
+            if (StringUtils.isBlank(posSide) ||
+                    (!"LONG".equalsIgnoreCase(posSide) && !"SHORT".equalsIgnoreCase(posSide))) {
+                throw new Ex400("Invalid posSide: must be 'LONG' or 'SHORT'.");
+            }
+
+            if (entryPrice == null || entryPrice <= 0) {
+                throw new Ex400("Entry price must be greater than 0.");
+            }
+
+            if (roi == null || roi <= 0) {
+                throw new Ex400("ROI must be greater than 0.");
+            }
+
+            if (usdt == null || usdt <= 0) {
+                throw new Ex400("USDT must be greater than 0.");
+            }
+
+            if (lever == null || lever <= 0) {
+                throw new Ex400("Leverage must be greater than 0.");
+            }
+
+            if (StringUtils.isBlank(clientId)) {
+                throw new Ex400("ClientId cannot be blank.");
+            }
+
+            SymbolInfo symbolInfo = getSymbolInfoOrLog(symbol);
+            if (symbolInfo == null) {
+                log.error("retryDca skipped: symbol info not found for symbol '{}'", symbol);
+                throw new Ex400("Symbol info not found for symbol: " + symbol);
+            }
+
+            BigDecimal dcaPrice = calculateDCAPrice(entryPrice, roi, lever, symbolInfo, posSide);
+            if (dcaPrice == null || dcaPrice.doubleValue() == 0) {
+                log.warn("retryDca is null or zero for symbol '{}', entryPrice={}, roi={}, lever={}", symbol, entryPrice, roi, lever);
+                throw new Ex400("DCA price calculation failed for symbol: " + symbol);
+            }
+
+            BigDecimal quantity = CalculatorUtil.quantity(usdt, dcaPrice.doubleValue(), symbolInfo.getStepSize(), symbolInfo.getQuantityPrecision());
+            if (quantity.doubleValue() == 0) {
+                log.warn("Calculated quantity retryDca is zero for symbol '{}', usdt={}, price={}", symbol, usdt, dcaPrice);
+                throw new Ex400("Calculated quantity is zero for symbol: " + symbol);
+            }
+
+            sendLimitOrder(authRequest, symbol, posSide, getSideFromDca(posSide), dcaPrice, quantity, clientId);
+        } catch (Ex400 ex400) {
+            throw ex400;
+        } catch (Exception e) {
+            log.error("Error retrying DCA order: {}", e.getMessage());
+            throw new RuntimeException(e);
+        }
+    }
+
     public void createTP(AuthRequest authRequest, DataOrder order, StepConfig config, PositionInfo positionInfo) {
         try {
             if (!isValidTPInput(order, config, positionInfo)) {
@@ -224,62 +286,6 @@ public class OrderApi {
             sendSLOrder(authRequest, symbol, posSide, getSideFromSL(posSide), slPrice);
         } catch (Exception e) {
             log.error("Error creating SL order: {}", e.getMessage());
-        }
-    }
-
-    public void createDR(AuthRequest authRequest, DataOrder order, StepConfig config, PositionInfo positionInfo) {
-        try {
-            if (!isValidDRInput(order, config, positionInfo)) {
-                log.warn("createDR skipped: invalid input parameters for order={}, config={}, positionInfo={}", order, config, positionInfo);
-                return;
-            }
-
-            String symbol = order.getSymbol();
-            String posSide = order.getPositionSide();
-            SymbolInfo symbolInfo = getSymbolInfoOrLog(symbol);
-            if (symbolInfo == null) return;
-
-            BigDecimal drPrice = calculateDRPrice(positionInfo.getEntryPrice(), config.getPriceDropPercent(), config.getLever(), symbolInfo, posSide);
-            double quantityDrop = CalculatorUtil.reduceQuantity(positionInfo.getPositionAmt(), config.getQuantityDropPercent(), symbolInfo.getStepSize(), symbolInfo.getQuantityPrecision());
-
-            if (drPrice == null || ValidationUtil.isNulOrZero(quantityDrop)) {
-                log.info("DR price or quantity is null or zero for symbol '{}', entryPrice={}, priceDropPercent={}, lever={}",
-                        symbol, positionInfo.getEntryPrice(), config.getPriceDropPercent(), config.getLever());
-                return;
-            }
-
-            String side = getSideFromDR(posSide);
-            LinkedHashMap<String, Object> params = new LinkedHashMap<>();
-            params.put("symbol", symbol);
-            params.put("positionSide", posSide);
-            params.put("side", side);
-            params.put("quantity", quantityDrop);
-            params.put("timeInForce", "GTC");
-            params.put("newClientOrderId", StringUtil.random(CommonConstant.DR));
-
-            if (PositionSideEnum.LONG.name().equals(posSide)) {
-                if (drPrice.doubleValue() < positionInfo.getEntryPrice()) {
-                    params.put("type", OrderType.STOP_MARKET.name()); //sl
-                    params.put("stopPrice", drPrice);
-                } else {
-                    params.put("type", OrderType.LIMIT.name()); //tp
-                    params.put("price", drPrice);
-                }
-            } else {
-                if (drPrice.doubleValue() > positionInfo.getEntryPrice()) {
-                    params.put("type", OrderType.STOP_MARKET.name());
-                    params.put("stopPrice", drPrice);
-                } else {
-                    params.put("type", OrderType.LIMIT.name());
-                    params.put("price", drPrice);
-                }
-            }
-
-            RequestHandler handler = new RequestHandler(restTemplate, authRequest.getApiKey(), authRequest.getSecretKey());
-            ResponseEntity<String> response = handler.sendSignedRequest(envConfig.getBaseApi(), "/fapi/v1/order", params, HttpMethod.POST, String.class);
-            log.info("DR order placed: {}", response.getBody());
-        } catch (Exception e) {
-            log.error("Error creating DR order: {}", e.getMessage());
         }
     }
 
@@ -379,26 +385,12 @@ public class OrderApi {
         return PositionSideEnum.LONG.name().equals(posSide) ? SideEnum.SELL.name() : SideEnum.BUY.name();
     }
 
-    private String getSideFromDR(String posSide) {
-        return PositionSideEnum.LONG.name().equals(posSide) ? SideEnum.SELL.name() : SideEnum.BUY.name();
-    }
-
     private BigDecimal calculateDCAPrice(double entryPrice, double roi, int leverage, SymbolInfo info, String posSide) {
         return switch (PositionSideEnum.valueOf(posSide)) {
             case LONG ->
                     CalculatorUtil.dcaLongPrice(entryPrice, roi, leverage, info.getTickSize(), info.getPricePrecision());
             case SHORT ->
                     CalculatorUtil.dcaShortPrice(entryPrice, roi, leverage, info.getTickSize(), info.getPricePrecision());
-            default -> null;
-        };
-    }
-
-    private BigDecimal calculateDRPrice(double entryPrice, double pricePercent, int leverage, SymbolInfo info, String posSide) {
-        return switch (PositionSideEnum.valueOf(posSide)) {
-            case LONG ->
-                    CalculatorUtil.priceDrop(entryPrice, pricePercent, leverage, info.getTickSize(), info.getPricePrecision(), true);
-            case SHORT ->
-                    CalculatorUtil.priceDrop(entryPrice, pricePercent, leverage, info.getTickSize(), info.getPricePrecision(), false);
             default -> null;
         };
     }
@@ -441,10 +433,4 @@ public class OrderApi {
                 ValidationUtil.allNotNulNotZero(config.getStopLoss(), config.getLever(), info.getEntryPrice());
     }
 
-    private boolean isValidDRInput(DataOrder order, StepConfig config, PositionInfo info) {
-        return order != null && config != null && info != null &&
-                StringUtils.isNoneEmpty(order.getSymbol(), order.getPositionSide()) &&
-                ValidationUtil.allNotNulNotZero(config.getQuantityDropPercent(), config.getPriceDropPercent(),
-                        config.getLever(), info.getEntryPrice(), info.getPositionAmt());
-    }
 }

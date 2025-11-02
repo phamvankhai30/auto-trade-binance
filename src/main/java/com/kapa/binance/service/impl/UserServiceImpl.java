@@ -1,5 +1,6 @@
 package com.kapa.binance.service.impl;
 
+import com.kapa.binance.base.exception.Ex404;
 import com.kapa.binance.base.utils.AesEncrypt;
 import com.kapa.binance.config.EnvConfig;
 import com.kapa.binance.entity.UserEntity;
@@ -79,5 +80,21 @@ public class UserServiceImpl implements UserService {
             log.error("Error getUserAuthByUuid uuid {}: {}", uuid, e.getMessage());
             return null;
         }
+    }
+
+    @Override
+    public AuthRequest getUserAuthByUuidWithError(String uuid) {
+        UserEntity user = userRepository.findFirstByUuid(uuid);
+        if (user == null) throw new Ex404("User not found with uuid: " + uuid);
+
+        String apiKey = user.getApiKey();
+        String apiSecret = user.getSecretKey();
+
+        return AuthRequest.builder()
+                .apiKey(apiKey)
+                .secretKey(AesEncrypt.decrypt(apiSecret, envConfig.getSecretKey()))
+                .uuid(user.getUuid())
+                .isActive(user.getIsActive())
+                .build();
     }
 }

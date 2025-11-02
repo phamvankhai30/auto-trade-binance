@@ -12,7 +12,7 @@ import lombok.NoArgsConstructor;
 @Builder
 public class ClosePositionReq {
 
-    @NotBlank(message = "isCopier cannot be blank")
+    @NotNull(message = "isCopier cannot be blank")
     private Boolean isCopier;
 
     @NotBlank(message = "uuid cannot be blank")

@@ -27,6 +27,7 @@ public class UserConnectionContext {
     private String apiKey;
     private String listenKey;
     private String uuid;
+    private Integer countRetryKey;
     private final Deque<Instant> connectTimestamps = new ArrayDeque<>();
 
     public void cleanup() {

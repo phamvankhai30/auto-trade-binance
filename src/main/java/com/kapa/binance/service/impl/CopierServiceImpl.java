@@ -153,17 +153,23 @@ public class CopierServiceImpl implements CopierService {
 
     private void updateLever(AuthRequest authRequest, Integer leverage, String symbol, String posSide) {
         try {
-            PositionInfo p = positionApi.getPositionInfo(authRequest, symbol, posSide);
-            if (p != null && p.getPositionAmt() == 0 && (int) leverage != p.getLeverage()) {
+            PositionInfo position = positionApi.getPositionInfo(authRequest, symbol, posSide);
+            String uuid = authRequest.getUuid();
+
+            if (position == null) {
+                log.info("Copier {} has no position info → init leverage {} for {} {}", uuid, leverage, symbol, posSide);
                 accountApi.changeLeverage(authRequest, symbol, leverage);
-                log.info("Copier uuid {} change leverage to {} for symbol {} posSide {}",
-                        authRequest.getUuid(), leverage, symbol, posSide);
-            } else {
-                log.info("Copier uuid {} has open position, skip change leverage for symbol {} posSide {}",
-                        authRequest.getUuid(), symbol, posSide);
+                return;
+            }
+
+            int currentLeverage = position.getLeverage();
+
+            if (!leverage.equals(currentLeverage)) {
+                accountApi.changeLeverage(authRequest, symbol, leverage);
+                log.info("Copier {} changed leverage → {} for {} {}", uuid, leverage, symbol, posSide);
             }
         } catch (Exception e) {
-            log.error("Copier uuid {} initLeverage Error: {}", authRequest.getUuid(), e.getMessage());
+            log.error("Copier {} updateLeverage error: {}", authRequest.getUuid(), e.getMessage(), e);
         }
     }
 

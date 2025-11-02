@@ -10,6 +10,7 @@ import com.kapa.binance.model.request.ConnectRequest;
 import com.kapa.binance.model.response.ConnectionResponse;
 import com.kapa.binance.service.ConnectService;
 import com.kapa.binance.service.OrderService;
+import com.kapa.binance.service.SendTelegramService;
 import com.kapa.binance.service.UserService;
 import com.kapa.binance.service.external.ListenKeyApi;
 import lombok.RequiredArgsConstructor;
@@ -18,6 +19,7 @@ import org.slf4j.MDC;
 import org.springframework.beans.factory.DisposableBean;
 import org.springframework.stereotype.Service;
 import org.springframework.web.client.HttpClientErrorException;
+import org.springframework.web.client.ResourceAccessException;
 import org.springframework.web.socket.CloseStatus;
 import org.springframework.web.socket.WebSocketHandler;
 import org.springframework.web.socket.WebSocketMessage;
@@ -36,12 +38,14 @@ public class ConnectServiceImpl implements ConnectService, DisposableBean {
 
     private static final String KEY_LOG = "userId";
     private static final int RENEW_INTERVAL_MINUTES = 50;
+    private static final int ERROR_DELAY_SECONDS = 3;
 
+    private final Map<String, UserConnectionContext> userContexts = new ConcurrentHashMap<>();
     private final EnvConfig envConfig;
     private final ListenKeyApi listenKeyApi;
     private final OrderService orderService;
     private final UserService userService;
-    private final Map<String, UserConnectionContext> userContexts = new ConcurrentHashMap<>();
+    private final SendTelegramService sendTelegramService;
 
     public static void withMDC(String value, Runnable task) {
         MDC.put(KEY_LOG, value);
@@ -216,7 +220,7 @@ public class ConnectServiceImpl implements ConnectService, DisposableBean {
 
                     if (isNormalClose) {
                         log.info("WebSocket closed normally. uuid={}, session={}, status={}", uuid, session.getId(), status);
-                        clearUser(uuid); // đóng bình thường thì dọn dẹp tài nguyên
+                        clearUser(authRequest); // đóng bình thường thì dọn dẹp tài nguyên
                         return;
                     }
 
@@ -229,7 +233,7 @@ public class ConnectServiceImpl implements ConnectService, DisposableBean {
 
                     if (!context.canReconnect()) {
                         log.warn("Reconnect limit reached for uuid={}, skipping reconnect", uuid);
-                        clearUser(uuid);
+                        clearUser(authRequest);
                         return;
                     }
 
@@ -277,7 +281,7 @@ public class ConnectServiceImpl implements ConnectService, DisposableBean {
         log.info("4. Create thread renew task: {}", uuid);
 
         if (context.getRenewTask() != null) {
-            log.info("Renew task already running for uuid: {}", context.getUuid());
+            log.info("Renew task already running for uuid: {}", uuid);
             return;
         }
 
@@ -287,17 +291,106 @@ public class ConnectServiceImpl implements ConnectService, DisposableBean {
             return t;
         });
 
+        String apiKey = context.getApiKey();
+
+        Runnable renewTask = new Runnable() {
+            @Override
+            public void run() {
+                try {
+                    boolean success = listenKeyApi.update(apiKey);
+
+                    if (success) {
+                        log.info("Successfully renewed listenKey for uuid: {}", uuid);
+                        context.setCountRetryKey(0);
+
+                        // Schedule lần kế tiếp sau đúng 50 phút
+                        ScheduledFuture<?> next = scheduler.schedule(this, RENEW_INTERVAL_MINUTES, TimeUnit.MINUTES);
+                        context.setRenewTask(next);
+
+                    } else {
+                        handleRetryOrClose();
+                    }
+
+                } catch (ResourceAccessException ex) {
+                    log.error("Network error renewing listenKey for uuid {}: {}", uuid, ex.getMessage());
+                    String apiKeyNew = listenKeyApi.create(apiKey);
+                    if (apiKeyNew != null) {
+                        context.setListenKey(apiKeyNew);
+                        context.setCountRetryKey(0);
+                        log.info("Created new listenKey after network error for uuid {}: {}", uuid, apiKeyNew);
+
+                        ScheduledFuture<?> next = scheduler.schedule(this, RENEW_INTERVAL_MINUTES, TimeUnit.MINUTES);
+                        context.setRenewTask(next);
+                    } else {
+                        handleRetryOrClose();
+                    }
+
+                } catch (Exception e) {
+                    log.error("Error renewing listenKey for uuid {}: {}", uuid, e.getMessage());
+                    handleRetryOrClose();
+                }
+            }
+
+            private void handleRetryOrClose() {
+                int retryCount = context.getCountRetryKey() == null ? 0 : context.getCountRetryKey();
+                if (retryCount >= 1) {
+                    log.warn("Retry already attempted for uuid: {} — closing session", uuid);
+                    context.closeSession();
+                    return;
+                }
+
+                log.warn("Failed to renew listenKey for uuid: {}, will retry once in {}s", uuid, ERROR_DELAY_SECONDS);
+                context.setCountRetryKey(retryCount + 1);
+
+                ScheduledFuture<?> retry = scheduler.schedule(this, ERROR_DELAY_SECONDS, TimeUnit.SECONDS);
+                context.setRenewTask(retry);
+            }
+        };
+
+        // Lên lịch lần đầu tiên sau 50 phút
+        ScheduledFuture<?> firstTask = scheduler.schedule(renewTask, RENEW_INTERVAL_MINUTES, TimeUnit.MINUTES);
+        context.setScheduler(scheduler);
+        context.setRenewTask(firstTask);
+    }
+
+    /*
+    private void startRenewTask(UserConnectionContext context) {
+        String uuid = context.getUuid();
+        log.info("4. Create thread renew task: {}", uuid);
+
+        if (context.getRenewTask() != null) {
+            log.info("Renew task already running for uuid: {}", uuid);
+            return;
+        }
+
+        ScheduledExecutorService scheduler = Executors.newSingleThreadScheduledExecutor(r -> {
+            Thread t = new Thread(r, "renew-task-" + uuid);
+            t.setDaemon(true);
+            return t;
+        });
+
+        String apiKey = context.getApiKey();
         ScheduledFuture<?> task = scheduler.scheduleWithFixedDelay(() -> {
             try {
-                boolean success = listenKeyApi.update(context.getApiKey());
+                boolean success = listenKeyApi.update(apiKey);
                 if (!success) {
-                    log.warn("Failed to renew listenKey for uuid: {}", context.getUuid());
+                    log.warn("Failed to renew listenKey for uuid: {}", uuid);
                     context.closeSession();
                 } else {
-                    log.info("Successfully renewed listenKey for uuid: {}", context.getUuid());
+                    log.info("Successfully renewed listenKey for uuid: {}", uuid);
+                }
+            } catch (ResourceAccessException exception) {
+                log.error("Network error renewing listenKey for uuid {}: {}", uuid, exception.getMessage());
+                String apiKeyNew = listenKeyApi.create(apiKey);
+                if (apiKeyNew != null) {
+                    context.setListenKey(apiKeyNew);
+                    log.info("Created new listenKey after network error for uuid {}: {}", uuid, apiKeyNew);
+                } else {
+                    log.error("Failed to create new listenKey after network error for uuid {}", uuid);
+                    context.closeSession();
                 }
             } catch (Exception e) {
-                log.error("Error renewing listenKey for uuid {}: {}", context.getUuid(), e.getMessage());
+                log.error("Error renewing listenKey for uuid {}: {}", uuid, e.getMessage());
                 context.closeSession();
             }
         }, RENEW_INTERVAL_MINUTES, RENEW_INTERVAL_MINUTES, TimeUnit.MINUTES);
@@ -305,10 +398,12 @@ public class ConnectServiceImpl implements ConnectService, DisposableBean {
         context.setScheduler(scheduler);
         context.setRenewTask(task);
     }
+    */
 
-    private void clearUser(String uuid) {
+    private void clearUser(AuthRequest authRequest) {
+        String uuid = authRequest.getUuid();
+        sendTelegramService.sendDisconnectMessage(authRequest);
         userService.updateStatusConnectAsync(List.of(uuid), ConnectedEnum.DISCONNECTED.name());
-
         UserConnectionContext context = userContexts.remove(uuid);
         if (context != null) {
             context.cleanup();

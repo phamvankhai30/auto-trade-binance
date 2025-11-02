@@ -9,4 +9,5 @@ public interface UserService {
     void updateStatusConnectSync(List<String> uuid, String connectStatus);
     List<AuthRequest> getAllUserAuth();
     AuthRequest getUserAuthByUuid(String uuid);
+    AuthRequest getUserAuthByUuidWithError(String uuid);
 }
