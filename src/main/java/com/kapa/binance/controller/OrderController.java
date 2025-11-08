@@ -95,7 +95,7 @@ public class OrderController {
         newOrder.setPosSide(posSide);
         newOrder.setSymbol(symbol);
         newOrder.setStep(nextStep);
-        newOrder.setMgnMode(order.getMgnMode());
+//        newOrder.setMgnMode(order.getMgnMode());
         newOrder.setIsNew(false);
         newOrder.setIsEndStep(false);
         newOrder.setVolume(order.getVolume());

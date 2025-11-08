@@ -23,9 +23,9 @@ public class StepSymbolEntity {
     private Double roi;
     private Double usdt;
     private Double takeProfit;
-    private Double stopLoss;
+//    private Double stopLoss;
     private Integer lever;
-    private Double quantityDropPercent;
-    private Double priceDropPercent;
+//    private Double quantityDropPercent;
+//    private Double priceDropPercent;
     private String uuid;
 }

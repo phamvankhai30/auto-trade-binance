@@ -309,10 +309,10 @@ public class OrderServiceImpl implements OrderService {
                     .roi(s.getRoi())
                     .usdt(s.getUsdt())
                     .takeProfit(s.getTakeProfit())
-                    .stopLoss(s.getStopLoss())
+//                    .stopLoss(s.getStopLoss())
                     .lever(s.getLever())
-                    .quantityDropPercent(s.getQuantityDropPercent())
-                    .priceDropPercent(s.getPriceDropPercent())
+//                    .quantityDropPercent(s.getQuantityDropPercent())
+//                    .priceDropPercent(s.getPriceDropPercent())
                     .step(s.getStep())
                     .build();
         } else if (step instanceof StepEntity s) {
@@ -320,10 +320,10 @@ public class OrderServiceImpl implements OrderService {
                     .roi(s.getRoi())
                     .usdt(s.getUsdt())
                     .takeProfit(s.getTakeProfit())
-                    .stopLoss(s.getStopLoss())
+//                    .stopLoss(s.getStopLoss())
                     .lever(s.getLever())
-                    .quantityDropPercent(s.getQuantityDropPercent())
-                    .priceDropPercent(s.getPriceDropPercent())
+//                    .quantityDropPercent(s.getQuantityDropPercent())
+//                    .priceDropPercent(s.getPriceDropPercent())
                     .step(s.getStep())
                     .build();
         }
@@ -366,7 +366,7 @@ public class OrderServiceImpl implements OrderService {
         ordEntity.setPosSide(order.getPositionSide());
         ordEntity.setSymbol(order.getSymbol());
         ordEntity.setStep(step);
-        ordEntity.setMgnMode(order.getStpMode());
+//        ordEntity.setMgnMode(order.getStpMode());
         ordEntity.setIsNew(isNew);
         ordEntity.setIsEndStep(false);
         ordEntity.setCreateAt(new Date());

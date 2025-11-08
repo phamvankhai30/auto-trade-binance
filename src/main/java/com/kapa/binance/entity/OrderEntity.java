@@ -26,7 +26,7 @@ public class OrderEntity {
     private Integer step;
     private String clientIdParent;
     private String clientIdChildren;
-    private String mgnMode;
+//    private String mgnMode;
     private Boolean isNew;
     private Boolean isEndStep;
     private Date createAt;
