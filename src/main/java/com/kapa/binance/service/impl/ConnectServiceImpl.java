@@ -18,6 +18,7 @@ import lombok.extern.slf4j.Slf4j;
 import org.slf4j.MDC;
 import org.springframework.beans.factory.DisposableBean;
 import org.springframework.stereotype.Service;
+import org.springframework.transaction.annotation.Transactional;
 import org.springframework.web.client.HttpClientErrorException;
 import org.springframework.web.client.ResourceAccessException;
 import org.springframework.web.socket.CloseStatus;
@@ -63,13 +64,14 @@ public class ConnectServiceImpl implements ConnectService, DisposableBean {
         log.info("All user close size: {}", uuidList.size());
     }
 
+    @Transactional
     @Override
     public void apiOpenConnect(ConnectRequest request) {
         String uuid = request.getUuid();
         AuthRequest auth = userService.getUserAuthByUuid(uuid);
 
         if (auth == null) throw new Ex422("User not found");
-        if (!auth.getIsActive()) throw new Ex422("User not active");
+        if (!Boolean.TRUE.equals(auth.getIsActive())) throw new Ex422("User not active");
         if (userContexts.containsKey(uuid)) throw new Ex422("User already connected");
 
         try {
@@ -102,6 +104,7 @@ public class ConnectServiceImpl implements ConnectService, DisposableBean {
         }
     }
 
+    @Transactional
     @Override
     public void apiResetConnect(ConnectRequest request) {
         String uuid = request.getUuid();

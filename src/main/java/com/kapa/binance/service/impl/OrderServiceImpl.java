@@ -12,9 +12,11 @@ import com.kapa.binance.model.dtos.StepConfig;
 import com.kapa.binance.model.response.DataOrder;
 import com.kapa.binance.model.response.PositionInfo;
 import com.kapa.binance.repository.*;
+import com.kapa.binance.service.CopierAccountService;
 import com.kapa.binance.service.CopierService;
 import com.kapa.binance.service.OrderService;
 import com.kapa.binance.service.SendTelegramService;
+import com.kapa.binance.service.external.AccountApi;
 import com.kapa.binance.service.external.OrderApi;
 import com.kapa.binance.service.external.PositionApi;
 import lombok.RequiredArgsConstructor;
@@ -25,6 +27,7 @@ import org.springframework.stereotype.Service;
 import java.time.LocalDateTime;
 import java.util.Date;
 import java.util.List;
+import java.util.concurrent.CompletableFuture;
 
 @Slf4j
 @RequiredArgsConstructor
@@ -35,15 +38,14 @@ public class OrderServiceImpl implements OrderService {
     private final OrderRepository orderRepository;
     private final StepRepository stepRepository;
     private final StepSymbolRepository stepSymbolRepository;
-//    private final MaxVolSymbolRepository maxVolSymbolRepository;
-//    private final MaxVolRepository maxVolRepository;
-//    private final AccountApi accountApi;
     private final PositionApi positionApi;
     private final OrderApi orderApi;
     private final CopierService copierService;
     private final ObjectMapper objectMapper;
     private final LogLeverRepository logLeverRepository;
     private final SendTelegramService sendTelegramService;
+    private final CopierAccountService copierAccountService;
+    private final AccountApi accountApi;
 
     @Override
     public void receiveMessage(AuthRequest authRequest, String message) {
@@ -53,18 +55,20 @@ public class OrderServiceImpl implements OrderService {
         }
 
         if (!StringUtils.contains(message, "ORDER_TRADE_UPDATE")) return;
-        log.info("Message: {}", message);
+
         DataOrder order = OrderMapper.mapDataOrder(message);
         if (order == null) {
             log.warn("receiveMessage - mapped order is null, skipping");
             return;
         }
 
-        if (isFilledMarketOrLimit(order) || isExpiredTakeProfit(order)) {
+//        if (isFilledMarketOrLimit(order) || isExpiredTakeProfit(order)) {
+        if (isFilledMarketOrLimit(order)) {
+            log.info("Message used: {}", message);
             copierService.sendCopierOrder(order, authRequest);
             handleOrder(authRequest, order);
         } else {
-            log.info("receiveMessage order not handled, conditions not met");
+            log.warn("Message not used: {}", message);
         }
     }
 
@@ -95,9 +99,24 @@ public class OrderServiceImpl implements OrderService {
 
             logLeverRepository.save(entity);
 
+            changeLeverageCopier(uuid, symbol, leverage);
         } catch (Exception e) {
             log.error("Error updating leverage for uuid {}: {}", uuid, e.getMessage(), e);
         }
+    }
+
+    private void changeLeverageCopier(String uuid, String symbol, int leverage) {
+        List<AuthRequest> copiers = copierAccountService.getCopierAuthByLeader(uuid);
+
+        copiers.forEach(auth ->
+                CompletableFuture.runAsync(() -> {
+                    try {
+                        accountApi.changeLeverage(auth, symbol, leverage);
+                    } catch (Exception e) {
+                        log.error("Error changing leverage for copier {}: {}", auth.getUuid(), e.getMessage(), e);
+                    }
+                })
+        );
     }
 
     private boolean isFilledMarketOrLimit(DataOrder o) {
@@ -114,35 +133,35 @@ public class OrderServiceImpl implements OrderService {
 
     private void handleOrder(AuthRequest authRequest, DataOrder order) {
         String side = order.getSide(); // BUY or SELL
-        log.info("handleOrder request, side={}, clientOrderId={}", side, order.getClientOrderId());
+        String positionSide = order.getPositionSide(); // LONG or SHORT
+        String clientOrderId = order.getClientOrderId();
+
+        log.info("handleOrderMatching - Request position={} side={}, clientOrderId={}", positionSide, side, clientOrderId);
+
         if (SideEnum.BUY.name().equals(side)) {
-            log.info("handleOrder - Processing BUY side");
             handlePosSideOrder(PositionSideEnum.SHORT, PositionSideEnum.LONG, authRequest, order);
         } else if (SideEnum.SELL.name().equals(side)) {
-            log.info("handleOrder - Processing SELL side");
             handlePosSideOrder(PositionSideEnum.LONG, PositionSideEnum.SHORT, authRequest, order);
         } else {
-            log.warn("handleOrder - Unsupported side: {}", side);
+            log.warn("handleOrderMatching - Unsupported side: {}", side);
         }
     }
 
     private void handlePosSideOrder(PositionSideEnum closingSide, PositionSideEnum openingSide,
                                     AuthRequest authRequest, DataOrder order) {
         String positionSide = order.getPositionSide();
-        String originOrderType = order.getOriginalOrderType();
+        String symbol = order.getSymbol();
 
-        log.info("handlePosSideOrder request positionSide={}, originOrderType={}", positionSide, originOrderType);
         if (closingSide.name().equals(positionSide)) {
-            log.info("handlePosSideOrder - Detected closing side: {}", positionSide);
+            log.info("handlePosSideOrder - Closing position={} symbol={}", positionSide, symbol);
             handleCloseOrder(authRequest, order); // Đóng position -> cancel các order con còn mở
 
-            if (OrderType.TAKE_PROFIT_MARKET.name().equals(originOrderType)) {
-                log.info("handlePosSideOrder - Handling take profit for order type: {}", originOrderType);
+            if (OrderType.TAKE_PROFIT_MARKET.name().equals(order.getOriginalOrderType())) {
                 sendTelegramService.sendTakeProfitMessage(authRequest, order);
                 handleTakeProfit(authRequest, order);
             }
         } else if (openingSide.name().equals(positionSide)) {
-            log.info("handlePosSideOrder - Detected opening side: {}", positionSide);
+            log.info("handlePosSideOrder - Opening position={} symbol={}", positionSide, symbol);
             handleOpenOrder(authRequest, order);
         } else {
             log.warn("handlePosSideOrder - Unexpected position side: {}", positionSide);
@@ -153,10 +172,9 @@ public class OrderServiceImpl implements OrderService {
         String symbol = order.getSymbol();
         String posSide = order.getPositionSide();
 
-        log.info("handleCloseOrder request symbol={}, posSide={}", symbol, posSide);
-
         List<String> clientOrderIds = orderApi.getClientIdByOrderOpen(authRequest, symbol, posSide);
-        log.info("handleCloseOrder - clientOrderIds to cancel: {}", clientOrderIds);
+
+        log.info("handleCloseOrder - Symbol={} position={} clientOrderId={}", symbol, posSide, clientOrderIds);
 
         orderApi.cancelOrderByClientIds(authRequest, symbol, clientOrderIds);
     }
@@ -165,7 +183,7 @@ public class OrderServiceImpl implements OrderService {
         String symbol = order.getSymbol();
         String posSide = order.getPositionSide();
 
-        log.info("handleTakeProfit - request symbol={}, posSide={}", symbol, posSide);
+        log.info("handleTakeProfit - symbol={}, posSide={}", symbol, posSide);
         RepeatSymbolEntity repeatEntity =
                 repeatSymbolRepository.findFirstByUuidAndSymbolAndPosSideAndIsActiveTrue(authRequest.getUuid(), symbol, posSide
                 );
@@ -328,7 +346,7 @@ public class OrderServiceImpl implements OrderService {
 
     private void slAndTpAndDr(AuthRequest authRequest, DataOrder order, StepConfig config, PositionInfo positionInfo) {
         orderApi.createTP(authRequest, order, config, positionInfo);
-        orderApi.createSL(authRequest, order, config, positionInfo);
+//        orderApi.createSL(authRequest, order, config, positionInfo);
 
 //        if (config.getStep() != 1){
 //            orderApi.createDR(authRequest, order, config, positionInfo);

@@ -42,16 +42,16 @@ public class OrderApi {
     private final MarketApi marketApi;
 
     public List<String> getClientIdByOrderOpen(AuthRequest authRequest, String symbol, String positionSide) {
-        log.info("getClientIdByOrderOpen request symbol={}, positionSide={}", symbol, positionSide);
-
         List<String> clientIds = getAllOpenOrders(authRequest, symbol).stream()
                 .filter(order -> positionSide.equals(order.getPositionSide()))
                 .map(OrderInfo::getClientOrderId)
                 .collect(Collectors.toList());
 
-        log.info("getClientIdByOrderOpen response clientIds={}", clientIds);
+        log.info("getClientIdByOrderOpen: symbol={}, positionSide={}, clientIds={}",
+                symbol, positionSide, clientIds);
         return clientIds;
     }
+
 
     public List<OrderInfo> getAllOpenOrders(AuthRequest authRequest, String symbol) {
         try {
@@ -70,14 +70,11 @@ public class OrderApi {
             );
 
             if (response.getStatusCode().is2xxSuccessful()) {
-                List<OrderInfo> orders = Optional.ofNullable(response.getBody())
+                return Optional.ofNullable(response.getBody())
                         .orElse(Collections.emptyList())
                         .stream()
                         .filter(order -> "NEW".equals(order.getStatus()))
                         .collect(Collectors.toList());
-
-                log.info("getAllOpenOrders response returned {} new orders", orders.size());
-                return orders;
             } else {
                 log.warn("getAllOpenOrders non-success status={}, body={}",  response.getStatusCode(), response.getBody());
                 return Collections.emptyList();

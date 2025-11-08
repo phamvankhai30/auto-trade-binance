@@ -90,7 +90,7 @@ public class DataOrder {
     private Boolean isCloseAll; // If Close-All, pushed with conditional order
 
     @JsonProperty("rp")
-    private String realizedProfit; // Realized Profit of the trade
+    private Double realizedProfit; // Realized Profit of the trade
 
     @JsonProperty("pP")
     private Boolean isPriceProtectionOn; // If price protection is turned on

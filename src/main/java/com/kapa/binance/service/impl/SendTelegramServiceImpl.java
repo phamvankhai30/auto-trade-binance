@@ -64,6 +64,12 @@ public class SendTelegramServiceImpl implements SendTelegramService {
                 ? authRequest.getFullName()
                 : authRequest.getUuid();
 
+        Double realizedProfit = order.getRealizedProfit();
+        if (realizedProfit == null || realizedProfit == 0) {
+            log.debug("Skipped sending Take Profit message with zero profit");
+            return;
+        }
+
         String message = """
                 💰 <b>Take Profit Alert</b> 💰
                 User: %s
@@ -74,7 +80,7 @@ public class SendTelegramServiceImpl implements SendTelegramService {
                 fullName,
                 order.getSymbol(),
                 order.getPositionSide(),
-                order.getRealizedProfit()
+                realizedProfit
         );
 
         sendMessage(message);
